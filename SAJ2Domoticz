@@ -1,0 +1,64 @@
+commandArray = {}
+lineNo = 0
+now    = 0
+temp   = 0
+today  = 0
+total  = 0
+v1     = 0
+v2     = 0
+i1     = 0
+i2     = 0
+ip     = 'xxx.xxx.xx.xxx'
+i = 1
+
+-- Only run during day
+if ( uservariables["nacht"] == 0 ) then
+    function UpdateDevice(device, data)
+        idx = otherdevices_idx[device]
+        if (idx == nil) then
+            print('** Unknown device '..device)
+        else
+            commandArray[i] = {['UpdateDevice'] = idx..'|0|'..data}
+            i = i+1
+        end
+    end
+
+	--Get the XML data from the inverter
+    local url = 'curl http://'..ip..'/real_time_data.xml'
+    local data = assert(io.popen(url))
+
+    for line in data:lines() do
+
+        if (lineNo == 0 and string.find(line,'Normal') ~= nil) then
+            lineNo = 1
+        elseif (lineNo > 0) then
+            if     (lineNo == 4) then now   = string.match(line, "%d+")
+            elseif (lineNo == 5) then temp  = string.match(line, "%d+%.%d+")
+            elseif (lineNo == 6) then today = string.match(line, "%d+%.%d+")
+            elseif (lineNo == 8) then total = string.match(line, "%d+%.%d+")
+            end
+            lineNo = lineNo + 1
+        end
+    end
+
+    data:close()
+
+    if (lineNo >= 14) then
+        -- Update the Domoticz GUI
+        ep = v1*i1
+        wp = v2*i2
+        UpdateDevice('Solar', now..";".. total*1000)
+        UpdateDevice('Invtemp', temp)
+
+		-- Upload the data to PVoutput every 10 mins
+		-- date = os.date("*t")
+		-- if (date.min % 10 == 0) then
+		--     baseURL="http://pvoutput.org/service/r2/addstatus.jsp?"
+		--     API="yourAPIkey"
+		--     PVO_URL= baseURL .. "sid=36263&key=" .. API .. "&d=" .. os.date("%Y%m%d") .. "&t=" .. os.date("%H:%M")
+		--     PVO_URL = PVO_URL .. "&v1=" .. (today*1000) .. "&v2=" .. now
+		--     commandArray['OpenURL'] = PVO_URL
+		-- end
+   end
+end
+return commandArray
